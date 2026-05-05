@@ -18,3 +18,7 @@ async def read_item(request: Request):
 @app.get("/status")
 def get_status():
     return {"status": "Terminal is running and Git is watching!"}
+    
+    
+#added it to test after renaming repo 
+

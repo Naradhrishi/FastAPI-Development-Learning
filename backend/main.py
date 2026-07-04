@@ -1,42 +1,19 @@
-# from fastapi import FastAPI
-# from fastapi.middleware.cors import CORSMiddleware
-
-# app = FastAPI()
-
-# # Allow your React frontend to connect
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:5173"], # React's default port
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# # Endpoint 1: A simple welcome message
-# @app.get("/api/message")
-# def get_message():
-#     return {"text": "Hello from the FastAPI backend!"}
-
-# # Endpoint 2: A simple data processing endpoint
-# @app.get("/api/calculate")
-# def get_calculation(number: int = 5):
-#     return {"result": number * 2}
-
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, HTTPException, status
 from typing import Annotated, Optional
+from pydantic import BaseModel, Field
 
 
 app = FastAPI()
 
 #  STATIC PATH ROUTE or static endpoint
-# fixed parameter based api should come first before dynamic one because it gets executed in top to down order
+# fixed parameter based api should come first before dynamic one Because path operations are evaluated in order
 @app.get("/api/v1/message")
-def get_message():
+def get_static_message():
     return {"text": "Hello from the FastAPI backend!"}
 
 # DYNAMIC PATH ENDPOINT / PATH PARAMETER ROUTE / 
 @app.get("/api/v1/{message}")
-def get_message(message: str):
+def get_dynamic_message(message: str):
     return {"your message": f'{message}'}
 
 
@@ -51,21 +28,110 @@ def get_message(message: str):
 
 # MULTIPLE QUERY PARAMETER ROUTE
 @app.get("/api/v1/")
-def get_message(name:str ="Guest", message: Optional[str]=None):
+def get_query_message(name:str ="Guest", message: Optional[str]=None):
     if message:
         return {f"{name} message": f'{message}'}
     else:
         return {f'{name} message' : "no message has been send"}
         
+@app.get("/api/v1/profiles/{id}")
+def get_id(id: int):
+    return{"your id is: " : id}
 
 
 @app.get("/api/v1/users")
 def get_users():
     return {"all users" : ["ram","shyam"]}
 
+# multiple path and query parameters
+@app.get("/api/v1/orders/{order_id}/items/{item_id}")
+async def get_order_and_item(order_id: int, item_id: int, price: float | None = None):
+    if not price:
+        return {
+            "your order" : order_id,
+            "item" : item_id,
+            "price" : price
+        }
+    else:
+        return {
+            "your order" : order_id,
+            "item" : item_id
+        }
+
+
 
 @app.post("/api/v1/devs")
 def create_dev(data_from_user: Annotated[dict[str , str | int], Body(title="create developer")]):
     print(data_from_user)
     return {"message": "user created", "data": data_from_user}
+
+
+
+#  Employee based ***CRUD*** based employee app which is version 2
+# NOTE :- using Annotated is latest and best practice 
+# and inside Annotated if we use Field then we don't have to use Body, Query, Path etc.. they all are just subclass of Field class
+
+employees_data = []
+class Address(BaseModel):
+    city: Annotated[str, Field(min_length=2)]
+    pin_code: Annotated[int, Field(gt=100000, le=999999 )]
+class Employee(BaseModel):
+    id: Annotated[int, Field(gt=0, title="Employee id", description="Employee id can't be duplicate")]
+    name: Annotated[str, Field(title="Employee name")]
+    age: Annotated[int, Field(gt=0, le=120, title="Employee age")]
+    address: Annotated[Address, Field(title="address of the employee")]
+
+# need to create a partial model for employee data update because our original employee model having all fields necessary
+
+class EmployeeUpdate(BaseModel):
+    name: Annotated[Optional[str], Field(default=None)] = None
+    age: Annotated[Optional[int], Field(default = None, ge=0, le=120)]
+    address: Annotated[Optional[Address], Field(description="it would be null if not provided")] = None
+
+#read data
+@app.get("/api/v2/employees")
+async def get_employee():
+    return employees_data
+
+
+@app.get("/api/v2/employees/{id}")
+async def get_employee_with_id(id: Annotated[int, Path(title="The ID of the employee", gt=0)]):
+    for emp in employees_data:
+        if emp.id == id:
+            return emp
+    raise HTTPException(status_code = 404, detail="Employee not found for this id")
+
+
+# This endpoint create employee
+@app.post("/api/v2/employees", status_code = status.HTTP_201_CREATED)
+async def create_employee(emp: Employee):
+    # create the employee here means add to the list
+    employees_data.append(emp)
+    return {
+        "message" : "Employee has been created successfully.",
+        "data" : emp
+    }
+
+#  for making update - for partial update we use PATCH and for total replace/full update use PUT
+@app.patch("/api/v2/employees/{id}")
+async def update_employee(id: int, patch_data: EmployeeUpdate):
+    for emp in employees_data:
+        if emp.id == id:
+            # how to update here and what data should i allow to update data
+
+
+# Delete API endpoint
+@app.delete("/api/v2/employees/{id}", status_code=status.HTTP_200_OK)
+async def delete_employee_with_id(id: Annotated[int, Path(title="The ID of the employee", gt=0)]):
+        for emp in employees_data:
+            if emp.id == id:
+                employees_data.remove(emp)
+                return {
+                    "message" : f'Employee {id} as been deleted successfully.'
+                }
+        raise HTTPException(status_code = 404, detail = "Employee not found with this id.")
+        
+        
+
+
 

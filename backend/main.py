@@ -175,19 +175,52 @@ async def create_user(user: User, session: Session = Depends(get_session)):
     session.refresh(user)
     return user
 
-# @app.patch("/api/v3/{user_id}",  response_model = User)
-# async def update_user(
-#     user_id: int,
-#     update_user: UpdateUser,
-#     session: Session = Depends(get_session)
-#     ):
-#     existing_user = session.get(User, user_id)
-#     if not existing_user:
-#         raise HTTPException(status_code = 404, detail = "User not found!")
-#     else:
+
+@app.patch("/api/v3/users/{user_id}",  response_model = User)
+async def update_user(
+    user_id: int,
+    update_user: UpdateUser,
+    session: Session = Depends(get_session)
+    ):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code = 404, detail = "User not found!")
+    else:
+        update_user_sent_data = update_user.model_dump(exclude_unset = True)
+
+        for key, value in update_user_sent_data.items():
+            # setattr(object_name, attribute_name_string, new_value_to_set)
+            setattr(user, key, value)
+
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+        return user
 
 
-# @app.delete("/api/v3/{user_id}")
-# async def delete_user_with_id(user_id: int):
+        # THIS IS NOT safe and best practice so use model_dump instead to convert from Python object to Python dictionary
+        # if update_user.name is not None:
+        #     user.name = update_user.name
+        
+        # if update_user.age is not None:
+        #     user.age = update_user.age
+        
+        # if update_user.is_married is not None:
+        #     user.is_married = update_user.is_married
+        
+        # session.commit()
+        # session.refresh(user)
+        # return user
+
+@app.delete("/api/v3/users/{user_id}")
+async def delete_user_with_id(user_id: int, session: Session = Depends(get_session)):
+    query = select(User).where(User.id == user_id)
+    user = session.exec(query).one()
+
+    session.delete(user)
+    session.commit()
+    print(f'user with id {user_id} got deleted!')
+
 
 

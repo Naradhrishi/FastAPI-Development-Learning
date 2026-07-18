@@ -1,0 +1,163 @@
+Okay, forget senior developer talk. I will teach you like you are in 10th class. Every single word, like we did for middleware.
+
+### Your full code, I will break into 5 small pieces.
+
+### Piece 1: The imports - The tools you bring to school bag
+
+```python
+import redis.asyncio as redis
+```
+
+`import redis.asyncio as redis` = You are bringing a notebook called redis. `asyncio` means this notebook is fast, it doesn't make you wait. `as redis` means we will call it short name `redis` instead of long `redis.asyncio`.
+
+Why redis? We need a small rough notebook where bouncer will write counting with pencil that auto-erases.
+
+```python
+from fastapi_limiter import FastAPILimiter
+```
+
+`FastAPILimiter` = The Bouncer Company. This company gives you bouncers. You have to tell this company: "Hey, here is my notebook, use this notebook to count".
+
+```python
+from fastapi_limiter.depends import RateLimiter
+```
+
+`RateLimiter` = The Actual Bouncer. This is the man who stands at gate. `FastAPILimiter` is company, `RateLimiter` is the man.
+
+Remember:
+Company = `FastAPILimiter` - you init it once at startup
+Man = `RateLimiter(times=2, seconds=60)` - you put him at each gate
+
+### Piece 2: The on_setup - Morning assembly
+
+```python
+@asynccontextmanager
+async def on_setup(app: FastAPI):
+```
+
+This is morning assembly of school. Whatever you write before `yield` happens when school opens. Whatever after `yield` happens when school closes.
+
+`async` = you can do many works together, not one by one.
+`def on_setup(app: FastAPI):` = function name is `on_setup`, it gets your full school `app`.
+
+Inside assembly:
+
+```python
+    create_db_and_tables()
+    print("table created")
+```
+Old work - make benches and tables.
+
+```python
+    redis_connection = redis.from_url("redis://localhost:6379", encoding="utf8", decode_responses=True)
+```
+
+Line by line word by word:
+
+- `redis.from_url(...)` = Connect to notebook
+- `"redis://localhost:6379"` = Address of notebook. `localhost` means your own laptop. `6379` is door number where Memurai sits. Like house number.
+- `encoding="utf8"` = Notebook should understand English letters
+- `decode_responses=True` = When you read from notebook, give me direct English, not coded language.
+
+Result saved in `redis_connection` variable. This is like you now have notebook in your hand.
+
+```python
+    await FastAPILimiter.init(redis_connection)
+```
+
+- `FastAPILimiter.init(...)` = Hey Bouncer Company, start your work!
+- `redis_connection` inside = And use THIS notebook to count, not any other notebook.
+- `await` = Wait till company says "Okay started". Because connecting takes 1 second.
+
+```python
+    print("RATE LIMITER  ready and started", flush=True)
+```
+
+Just print. `flush=True` means print immediately, don't keep in buffer.
+
+```python
+    yield
+```
+
+`yield` = School opens now. All APIs start working. Morning assembly finished.
+
+```python
+    await FastAPILimiter.close()
+    print("REDIS CLOSED", flush=True)
+```
+
+School closes. Close the notebook. `await` because closing also takes time.
+
+### Piece 3: Making the FastAPI app
+
+```python
+app = FastAPI(lifespan = on_setup)
+```
+
+`FastAPI(lifespan=on_setup)` = Make school, and tell school "Your morning assembly function is `on_setup`". So school will call `on_setup` automatically at start.
+
+### Piece 4: The main magic - RateLimiter bouncer at gate
+
+```python
+@app.patch("/api/v3/users/{user_id}", dependencies = [Depends(RateLimiter(times = 2, seconds = 60))],  response_model = User)
+```
+
+Break this long line:
+
+`@app.patch("/api/v3/users/{user_id}" ...)` = This API updates a user.
+
+`dependencies = [...]` = Before entering this classroom, you must pass these checks. It's a list, you can put many bouncers.
+
+`Depends(RateLimiter(times = 2, seconds = 60))` = One bouncer.
+
+Inside `RateLimiter`:
+
+- `times = 2` = How many times allowed? 2 times.
+- `seconds = 60` = In how many seconds? In 60 seconds.
+
+So meaning: Allow only 2 times per 60 seconds.
+
+`Depends(...)` = FastAPI, please call this bouncer automatically before my function. I don't want to call him manually.
+
+`response_model = User` = After updating, return User.
+
+**What bouncer does internally (you don't write this, but this is what happens):**
+
+1. User 1 with IP `127.0.0.1` comes to PATCH `/users/3`
+2. Bouncer goes to Memurai notebook, searches key: `fastapi-limiter:127.0.0.1:/api/v3/users/3:2:60`
+3. Not found? He writes `1` and sets timer `expire 60 sec` and says OK go in.
+4. Same IP comes again within 60 sec? He reads `1`, makes `2`, says OK.
+5. Same IP comes 3rd time within 60 sec? He reads `2`, 2+1=3 which is >2, so he says STOP! Returns 429.
+6. After 60 sec, Memurai auto-erases the key. So next time count starts from 1 again.
+
+That's why you saw `retry-after: 24` - meaning 24 seconds left to erase.
+
+### Piece 5: Your function - The classroom
+
+```python
+async def update_user(
+    user_id: int,
+    update_user: UpdateUser,
+    session: Session = Depends(get_session)
+    ):
+```
+
+If bouncer says OK, only then you enter this classroom and update user. If bouncer says 429, this function NEVER runs. FastAPI returns 429 directly.
+
+### One question for you to never forget:
+
+**Why we didn't need to write `if count > 2: return 429`?**
+
+Because `RateLimiter` already has that `if` inside it. Its job is only that.
+
+So summary in 10th class words:
+
+1. `FastAPILimiter.init()` = Give notebook to bouncer company once at morning.
+2. `RateLimiter(times, seconds)` = Put bouncer at gate.
+3. Bouncer auto counts in Memurai and auto blocks with 429.
+
+That's full rate limiter.
+
+Now you know every word.
+
+Want me to make a small diagram image of how bouncer + Memurai + API work together so you can save it and never forget?

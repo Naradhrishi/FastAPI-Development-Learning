@@ -5,6 +5,10 @@ from sqlmodel import Session, select
 from database import get_session, create_db_and_tables
 from model import User, UpdateUser
 from typing import List
+import redis.asyncio as redis
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
+
 
 
 
@@ -16,8 +20,19 @@ async def on_setup(app: FastAPI):
     create_db_and_tables()
     print("table created")
 
+    # connect to redis notebook here 
+    redis_connection = redis.from_url("redis://localhost:6379", encoding="utf8", decode_responses=True)
+
+    await FastAPILimiter.init(redis_connection)
+    print("RATE LIMITER  ready and started", flush=True)
+
     yield
     #  now write the closing database code after yield
+
+    # close redis notebook connection here
+    await FastAPILimiter.close()
+    print("REDIS CLOSED", flush=True)
+
     print("everything closed")
 
 app = FastAPI(lifespan = on_setup)
@@ -53,7 +68,7 @@ async def create_user(user: User, session: Session = Depends(get_session)):
     return user
 
 
-@app.patch("/api/v3/users/{user_id}",  response_model = User)
+@app.patch("/api/v3/users/{user_id}", dependencies = [Depends(RateLimiter(times = 2, seconds = 60))],  response_model = User)
 async def update_user(
     user_id: int,
     update_user: UpdateUser,

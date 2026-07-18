@@ -1,5 +1,5 @@
 # ============= V3 =============
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from contextlib import asynccontextmanager
 from sqlmodel import Session, select
 from database import get_session, create_db_and_tables
@@ -21,6 +21,20 @@ async def on_setup(app: FastAPI):
     print("everything closed")
 
 app = FastAPI(lifespan = on_setup)
+
+
+@app.middleware("http")
+async def my_middleware(request: Request, call_next):
+    # do everything whatever needed to check or do before calling the actual api endpoint using call_next function
+    print("Checked everything ok", flush=True)
+    
+    # as all ok so calling the API
+    response = await call_next(request)
+
+    # now check or do anything you want with response that we get from the API and if all ok then return the response
+    print("Did whatever needed, now returning now...", flush=True)
+    return response
+
 
 # get API to fetch all users data
 @app.get("/api/v3/users", response_model = List[User], status_code = 200)

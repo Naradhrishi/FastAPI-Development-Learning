@@ -20,3 +20,11 @@ class SignupResponse(SQLModel):
     message: str
     name: str
     email: EmailStr 
+
+class LoginUser(SQLModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=15)
+
+class LoginResponse(SQLModel):
+    message : str
+    

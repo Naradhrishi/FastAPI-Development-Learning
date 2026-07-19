@@ -3,7 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from contextlib import asynccontextmanager
 from sqlmodel import Session, select
 from database import get_session, create_db_and_tables
-from model import User, SignupUser, SignupResponse
+from model import User, SignupUser, SignupResponse, LoginUser, LoginResponse
 from typing import List
 from pydantic import EmailStr
 from auth import hash_password, verify_password
@@ -112,3 +112,19 @@ async def sign_up(data: SignupUser, session: Session = Depends(get_session)):
 
     raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST, detail = 'User already exist! Try another email.')
 
+
+@app.post("/api/v4/login", response_model = LoginResponse)
+async def login(user: LoginUser, session: Session = Depends(get_session)):
+    # now first verify and check that is there any user exist with this credential or not?
+    # if exist then return JWT Access and Refresh token and if not then return appropriate message
+    signed_up = session.exec(select(User).where(User.email == user.email)).first()
+    
+    if not signed_up or not verify_password(user.password, signed_up.password):
+
+        # redirect the user to the signup page or also show the message that user does not exist, kindly signup, first.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail = "Incorrect email or password !")
+    else:
+        authenticated = LoginResponse(message="Successfully logged in !")
+        return authenticated
+
+        

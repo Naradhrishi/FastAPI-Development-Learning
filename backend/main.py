@@ -6,7 +6,9 @@ from database import get_session, create_db_and_tables
 from model import User, SignupUser, SignupResponse, LoginUser, LoginResponse
 from typing import List
 from pydantic import EmailStr
-from auth import hash_password, verify_password
+from auth import hash_password, verify_password, create_access_token, create_refresh_token
+from config import settings
+
 
 
 # with and yield are called as context manager in Python and latest version support async with yield which is async context manager
@@ -124,7 +126,17 @@ async def login(user: LoginUser, session: Session = Depends(get_session)):
         # redirect the user to the signup page or also show the message that user does not exist, kindly signup, first.
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail = "Incorrect email or password !")
     else:
-        authenticated = LoginResponse(message="Successfully logged in !")
-        return authenticated
+        #  write the code here to generate access and refresh token
+        payload = {"sub" : signed_up.email}
+        access_token = create_access_token(payload)
+        refresh_token = create_refresh_token(payload)
+        return {
+            "message" : "Successfully logged in !",
+            "access_token" : access_token,
+            "refresh_token" : refresh_token,
+            "token_type" : "bearer"
 
-        
+        }
+
+
+

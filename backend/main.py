@@ -1,89 +1,101 @@
-# ============= V3 =============
-from fastapi import FastAPI, Depends, HTTPException, status
-from contextlib import asynccontextmanager
-from sqlmodel import Session, select
-from database import get_session, create_db_and_tables
-from model import User, UpdateUser
-from typing import List
+# # ============= V3 =============
+# from fastapi import FastAPI, Depends, HTTPException, status
+# from contextlib import asynccontextmanager
+# from sqlmodel import Session, select
+# from database import get_session, create_db_and_tables
+# from model import User, UpdateUser
+# from typing import List
 
 
 
-# with and yield are called as context manager in Python and latest version support async with yield which is async context manager
-# event to handle db and table creation 
-@asynccontextmanager
-async def on_setup(app: FastAPI):
-    #  write everything before yield what you wanna execute on startup
-    create_db_and_tables()
-    print("table created")
+# # with and yield are called as context manager in Python and latest version support async with yield which is async context manager
+# # event to handle db and table creation 
+# @asynccontextmanager
+# async def on_setup(app: FastAPI):
+#     #  write everything before yield what you wanna execute on startup
+#     create_db_and_tables()
+#     print("table created")
 
-    yield
-    #  now write the closing database code after yield
-    print("everything closed")
+#     yield
+#     #  now write the closing database code after yield
+#     print("everything closed")
 
-app = FastAPI(lifespan = on_setup)
+# app = FastAPI(lifespan = on_setup)
 
-# get API to fetch all users data
-@app.get("/api/v3/users", response_model = List[User], status_code = 200)
-async def get_all_users(session: Session = Depends(get_session)):
-    query = select(User)
-    users = session.exec(query).all()
-    return users
+# # get API to fetch all users data
+# @app.get("/api/v3/users", response_model = List[User], status_code = 200)
+# async def get_all_users(session: Session = Depends(get_session)):
+#     query = select(User)
+#     users = session.exec(query).all()
+#     return users
 
     
-# apis to handle database as well 
-@app.post("/api/v3/users", response_model=User, status_code=201)
-async def create_user(user: User, session: Session = Depends(get_session)):
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    return user
+# # apis to handle database as well 
+# @app.post("/api/v3/users", response_model=User, status_code=201)
+# async def create_user(user: User, session: Session = Depends(get_session)):
+#     session.add(user)
+#     session.commit()
+#     session.refresh(user)
+#     return user
 
 
-@app.patch("/api/v3/users/{user_id}",  response_model = User)
-async def update_user(
-    user_id: int,
-    update_user: UpdateUser,
-    session: Session = Depends(get_session)
-    ):
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code = 404, detail = "User not found!")
-    else:
-        update_user_sent_data = update_user.model_dump(exclude_unset = True)
+# @app.patch("/api/v3/users/{user_id}",  response_model = User)
+# async def update_user(
+#     user_id: int,
+#     update_user: UpdateUser,
+#     session: Session = Depends(get_session)
+#     ):
+#     user = session.get(User, user_id)
+#     if not user:
+#         raise HTTPException(status_code = 404, detail = "User not found!")
+#     else:
+#         update_user_sent_data = update_user.model_dump(exclude_unset = True)
 
-        for key, value in update_user_sent_data.items():
-            # setattr(object_name, attribute_name_string, new_value_to_set)
-            setattr(user, key, value)
+#         for key, value in update_user_sent_data.items():
+#             # setattr(object_name, attribute_name_string, new_value_to_set)
+#             setattr(user, key, value)
 
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+#         session.add(user)
+#         session.commit()
+#         session.refresh(user)
 
-        return user
+#         return user
 
 
-        # THIS IS NOT safe and best practice so use model_dump instead to convert from Python object to Python dictionary
-        # if update_user.name is not None:
-        #     user.name = update_user.name
+#         # THIS IS NOT safe and best practice so use model_dump instead to convert from Python object to Python dictionary
+#         # if update_user.name is not None:
+#         #     user.name = update_user.name
         
-        # if update_user.age is not None:
-        #     user.age = update_user.age
+#         # if update_user.age is not None:
+#         #     user.age = update_user.age
         
-        # if update_user.is_married is not None:
-        #     user.is_married = update_user.is_married
+#         # if update_user.is_married is not None:
+#         #     user.is_married = update_user.is_married
         
-        # session.commit()
-        # session.refresh(user)
-        # return user
+#         # session.commit()
+#         # session.refresh(user)
+#         # return user
 
-@app.delete("/api/v3/users/{user_id}")
-async def delete_user_with_id(user_id: int, session: Session = Depends(get_session)):
-    query = select(User).where(User.id == user_id)
-    user = session.exec(query).one()
+# @app.delete("/api/v3/users/{user_id}")
+# async def delete_user_with_id(user_id: int, session: Session = Depends(get_session)):
+#     query = select(User).where(User.id == user_id)
+#     user = session.exec(query).one()
 
-    session.delete(user)
-    session.commit()
-    print(f'user with id {user_id} got deleted!')
+#     session.delete(user)
+#     session.commit()
+#     print(f'user with id {user_id} got deleted!')
 
 
+
+#================ V5 ===================
+from fastapi import FastAPI
+from routers import users
+
+
+app = FastAPI()
+app.include_router(users.router)
+
+@app.get("/")
+async def root():
+    return {"message":"This is root directory"}
 

@@ -4,7 +4,7 @@ from typing import Annotated, List
 from sqlmodel import Session, select
 from model import User
 
-
+# if any such dependency or response or prefix , tags etc. required for all these APIs then we can include those directly in APIRouter object here
 router = APIRouter(
     prefix="/users", 
     tags=["Users"],
